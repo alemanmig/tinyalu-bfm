@@ -25,8 +25,11 @@ XRUN    := xrun
 # Directorios y bibliotecas
 # ---------------------------------------------------------------------------
 DUT_DIR  := tinyalu_dut
-WORKLIB  := worklib          # nombre lógico de la biblioteca
-WORKDIR  := $(WORKLIB)       # directorio físico donde Xcelium guarda los objetos
+# IMPORTANTE: no poner comentarios inline en WORKLIB; Make los incluye en el valor
+WORKLIB  := worklib
+# strip() elimina espacios accidentales al usar la variable
+W        := $(strip $(WORKLIB))
+WORKDIR  := $(W)
 WAVES    := dump.shm
 
 # ---------------------------------------------------------------------------
@@ -65,9 +68,9 @@ TOP := top
 CDSLIB_OPT  := -cdslib $(CDSLIB)
 HDLVAR_OPT  := -hdlvar $(HDLVAR)
 
-XMVHDL_OPTS := -v93 -work $(WORKLIB) $(CDSLIB_OPT) $(HDLVAR_OPT)
-XMVLOG_OPTS := -sv   -work $(WORKLIB) $(CDSLIB_OPT) $(HDLVAR_OPT)
-XMELAB_OPTS := -access +rwc -timescale 1ns/1ps -work $(WORKLIB) \
+XMVHDL_OPTS := -v93 -work $(W) $(CDSLIB_OPT) $(HDLVAR_OPT)
+XMVLOG_OPTS := -sv   -work $(W) $(CDSLIB_OPT) $(HDLVAR_OPT)
+XMELAB_OPTS := -access +rwc -timescale 1ns/1ps -work $(W) \
                $(CDSLIB_OPT) $(HDLVAR_OPT)
 XMSIM_OPTS  := -input run.do $(CDSLIB_OPT) $(HDLVAR_OPT)
 
@@ -77,8 +80,7 @@ XRUN_OPTS := \
     -sv                      \
     -timescale 1ns/1ps       \
     -access +rwc             \
-    -top $(TOP)              \
-    -define $(WORKLIB)       \
+    -top $(TOP)     \
     -input run.do
 
 # ---------------------------------------------------------------------------
@@ -96,16 +98,16 @@ setup: $(CDSLIB) $(HDLVAR) $(WORKDIR)
 $(CDSLIB):
 	@echo ">>> Generando $(CDSLIB)..."
 	@echo 'INCLUDE $$CDS_INST_DIR/tools/inca/files/cds.lib' > $(CDSLIB)
-	@echo 'DEFINE  $(WORKLIB) ./$(WORKDIR)'                 >> $(CDSLIB)
+	@echo 'DEFINE  $(W) ./$(W)'                              >> $(CDSLIB)
 
 $(HDLVAR):
 	@echo ">>> Generando $(HDLVAR)..."
 	@echo 'INCLUDE $$CDS_INST_DIR/tools/inca/files/hdl.var' > $(HDLVAR)
-	@echo 'DEFINE  WORK $(WORKLIB)'                          >> $(HDLVAR)
+	@echo 'DEFINE  WORK $(W)'                                >> $(HDLVAR)
 
 $(WORKDIR):
-	@echo ">>> Creando directorio de biblioteca '$(WORKDIR)'..."
-	mkdir -p $(WORKDIR)
+	@echo ">>> Creando directorio de biblioteca '$(W)'..."
+	mkdir -p $(W)
 
 # ---------------------------------------------------------------------------
 # 1. Compilar VHDL
@@ -133,7 +135,7 @@ elab: compile_sv
 # ---------------------------------------------------------------------------
 sim: elab
 	@echo ">>> Simulando..."
-	$(XMSIM) $(XMSIM_OPTS) $(WORKLIB).$(TOP)
+	$(XMSIM) $(XMSIM_OPTS) $(W).$(TOP)
 
 # ---------------------------------------------------------------------------
 # Flujo todo-en-uno con xrun (más rápido para desarrollo)
@@ -158,7 +160,7 @@ waves:
 # ---------------------------------------------------------------------------
 cov:
 	@echo ">>> Generando reporte de cobertura..."
-	imc -load cov_work/scope/$(WORKLIB) -execcmd \
+	imc -load cov_work/scope/$(W) -execcmd \
 	    "report -summary -detail -out coverage_report.txt; exit"
 
 # ---------------------------------------------------------------------------
@@ -166,7 +168,7 @@ cov:
 # ---------------------------------------------------------------------------
 clean:
 	@echo ">>> Limpiando artefactos..."
-	rm -rf $(WORKDIR) $(WAVES) $(CDSLIB) $(HDLVAR) \
+	rm -rf $(W) $(WAVES) $(CDSLIB) $(HDLVAR) \
 	       *.log *.key *.diag cov_work coverage_report.txt \
 	       xrun.history .simvision *.shm *.dsn *.trn
 
