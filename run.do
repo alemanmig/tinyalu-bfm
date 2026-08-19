@@ -1,5 +1,5 @@
-# run.do — Script TCL para Xcelium (xmsim / xrun)
-# Corre la simulación hasta $finish y sale limpiamente
+# run.do — Script TCL para Xcelium xmsim
+# En Xcelium el comando es "run" (sin "-all"); corre hasta $finish
 
-run -all
+run
 exit
