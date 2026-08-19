@@ -1,11 +1,11 @@
 ###############################################################################
 # Makefile — TinyALU BFM Testbench  |  Cadence Xcelium
 #
-# Flujo: xmvhdl (compile VHDL) → xmvlog (compile SV) → xmelab → xmsim
+# Flujo: setup → xmvhdl → xmvlog → xmelab → xmsim
 # Alternativa rápida: target "xrun" usa el compilador todo-en-uno.
 #
 # Uso:
-#   make          → compila + elabora + simula (flujo paso a paso)
+#   make          → setup + compila + elabora + simula
 #   make xrun     → flujo todo-en-uno con xrun
 #   make waves    → abre SimVision con las formas de onda grabadas
 #   make cov      → genera reporte de cobertura
@@ -22,11 +22,18 @@ XMSIM   := xmsim
 XRUN    := xrun
 
 # ---------------------------------------------------------------------------
-# Directorios
+# Directorios y bibliotecas
 # ---------------------------------------------------------------------------
-DUT_DIR := tinyalu_dut
-WORK    := xcelium.d        # directorio de work library generado por Xcelium
-WAVES   := dump.shm
+DUT_DIR  := tinyalu_dut
+WORKLIB  := worklib          # nombre lógico de la biblioteca
+WORKDIR  := $(WORKLIB)       # directorio físico donde Xcelium guarda los objetos
+WAVES    := dump.shm
+
+# ---------------------------------------------------------------------------
+# Archivos de configuración de Cadence
+# ---------------------------------------------------------------------------
+CDSLIB   := cds.lib
+HDLVAR   := hdl.var
 
 # ---------------------------------------------------------------------------
 # Archivos VHDL del DUT  (orden de compilación: sub-bloques antes del top)
@@ -55,13 +62,14 @@ TOP := top
 # ---------------------------------------------------------------------------
 # Opciones de compilación
 # ---------------------------------------------------------------------------
-XMVHDL_OPTS := -v93 -work worklib
-XMVLOG_OPTS := -sv -work worklib
-XMELAB_OPTS := -access +rwc -timescale 1ns/1ps -work worklib
-XMSIM_OPTS  := -input run.do
+CDSLIB_OPT  := -cdslib $(CDSLIB)
+HDLVAR_OPT  := -hdlvar $(HDLVAR)
 
-# Opciones extra para cobertura (descomentar si se desea cobertura)
-# COV_OPTS    := -coverage all -covfile covfile.tcl
+XMVHDL_OPTS := -v93 -work $(WORKLIB) $(CDSLIB_OPT) $(HDLVAR_OPT)
+XMVLOG_OPTS := -sv   -work $(WORKLIB) $(CDSLIB_OPT) $(HDLVAR_OPT)
+XMELAB_OPTS := -access +rwc -timescale 1ns/1ps -work $(WORKLIB) \
+               $(CDSLIB_OPT) $(HDLVAR_OPT)
+XMSIM_OPTS  := -input run.do $(CDSLIB_OPT) $(HDLVAR_OPT)
 
 # Opciones todo-en-uno para xrun
 XRUN_OPTS := \
@@ -70,42 +78,72 @@ XRUN_OPTS := \
     -timescale 1ns/1ps       \
     -access +rwc             \
     -top $(TOP)              \
+    -define $(WORKLIB)       \
     -input run.do
 
 # ---------------------------------------------------------------------------
 # Target por defecto: flujo paso a paso
 # ---------------------------------------------------------------------------
-.PHONY: all compile_vhdl compile_sv elab sim xrun waves cov clean help
+.PHONY: all setup compile_vhdl compile_sv elab sim xrun waves cov clean help
 
 all: sim
 
-## 1. Compilar VHDL
-compile_vhdl: $(VHDL_SRCS)
+# ---------------------------------------------------------------------------
+# 0. Crear cds.lib, hdl.var y el directorio de la biblioteca
+# ---------------------------------------------------------------------------
+setup: $(CDSLIB) $(HDLVAR) $(WORKDIR)
+
+$(CDSLIB):
+	@echo ">>> Generando $(CDSLIB)..."
+	@echo 'INCLUDE $$CDS_INST_DIR/tools/inca/files/cds.lib' > $(CDSLIB)
+	@echo 'DEFINE  $(WORKLIB) ./$(WORKDIR)'                 >> $(CDSLIB)
+
+$(HDLVAR):
+	@echo ">>> Generando $(HDLVAR)..."
+	@echo 'INCLUDE $$CDS_INST_DIR/tools/inca/files/hdl.var' > $(HDLVAR)
+	@echo 'DEFINE  WORK $(WORKLIB)'                          >> $(HDLVAR)
+
+$(WORKDIR):
+	@echo ">>> Creando directorio de biblioteca '$(WORKDIR)'..."
+	mkdir -p $(WORKDIR)
+
+# ---------------------------------------------------------------------------
+# 1. Compilar VHDL
+# ---------------------------------------------------------------------------
+compile_vhdl: setup $(VHDL_SRCS)
 	@echo ">>> Compilando VHDL..."
 	$(XMVHDL) $(XMVHDL_OPTS) $(VHDL_SRCS)
 
-## 2. Compilar SystemVerilog
+# ---------------------------------------------------------------------------
+# 2. Compilar SystemVerilog
+# ---------------------------------------------------------------------------
 compile_sv: compile_vhdl $(SV_SRCS)
 	@echo ">>> Compilando SystemVerilog..."
 	$(XMVLOG) $(XMVLOG_OPTS) $(SV_SRCS)
 
-## 3. Elaborar
+# ---------------------------------------------------------------------------
+# 3. Elaborar
+# ---------------------------------------------------------------------------
 elab: compile_sv
 	@echo ">>> Elaborando..."
 	$(XMELAB) $(XMELAB_OPTS) $(TOP)
 
-## 4. Simular
+# ---------------------------------------------------------------------------
+# 4. Simular
+# ---------------------------------------------------------------------------
 sim: elab
 	@echo ">>> Simulando..."
-	$(XMSIM) $(XMSIM_OPTS) worklib.$(TOP)
+	$(XMSIM) $(XMSIM_OPTS) $(WORKLIB).$(TOP)
 
 # ---------------------------------------------------------------------------
 # Flujo todo-en-uno con xrun (más rápido para desarrollo)
 # ---------------------------------------------------------------------------
-xrun:
+xrun: setup
 	@echo ">>> Ejecutando xrun (todo-en-uno)..."
-	$(XRUN) $(XRUN_OPTS) \
-	    $(VHDL_SRCS)     \
+	$(XRUN) $(XRUN_OPTS)    \
+	    $(CDSLIB_OPT)        \
+	    $(HDLVAR_OPT)        \
+	    $(VHDL_SRCS)         \
 	    $(SV_SRCS)
 
 # ---------------------------------------------------------------------------
@@ -120,7 +158,7 @@ waves:
 # ---------------------------------------------------------------------------
 cov:
 	@echo ">>> Generando reporte de cobertura..."
-	imc -load cov_work/scope/worklib -execcmd \
+	imc -load cov_work/scope/$(WORKLIB) -execcmd \
 	    "report -summary -detail -out coverage_report.txt; exit"
 
 # ---------------------------------------------------------------------------
@@ -128,9 +166,9 @@ cov:
 # ---------------------------------------------------------------------------
 clean:
 	@echo ">>> Limpiando artefactos..."
-	rm -rf $(WORK) $(WAVES) *.log *.key *.diag \
-	       cov_work coverage_report.txt xrun.history \
-	       .simvision *.shm *.dsn *.trn
+	rm -rf $(WORKDIR) $(WAVES) $(CDSLIB) $(HDLVAR) \
+	       *.log *.key *.diag cov_work coverage_report.txt \
+	       xrun.history .simvision *.shm *.dsn *.trn
 
 # ---------------------------------------------------------------------------
 # Ayuda
@@ -138,9 +176,9 @@ clean:
 help:
 	@echo ""
 	@echo "  Targets disponibles:"
-	@echo "    make          → compile VHDL → compile SV → elab → sim"
+	@echo "    make          → setup → compile VHDL → compile SV → elab → sim"
 	@echo "    make xrun     → flujo todo-en-uno (xrun)"
 	@echo "    make waves    → abre SimVision con dump.shm"
 	@echo "    make cov      → genera reporte de cobertura (IMC)"
-	@echo "    make clean    → borra todos los artefactos"
+	@echo "    make clean    → borra todos los artefactos (incluye cds.lib/hdl.var)"
 	@echo ""
