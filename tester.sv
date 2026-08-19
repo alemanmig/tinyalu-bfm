@@ -4,8 +4,14 @@
 module tester (tinyalu_bfm bfm);
   import tinyalu_pkg::*;
 
+  // Variables declaradas a nivel de módulo para compatibilidad con Xcelium
+  logic [15:0] result;
+  logic [7:0]  rA, rB;
+  operation_t  op;
+  int          i;
+
   // -----------------------------------------------------------------------
-  // Función auxiliar para obtener operación aleatoria (excluye no_op)
+  // Función auxiliar: operación aleatoria (excluye no_op y rst_op)
   // -----------------------------------------------------------------------
   function operation_t get_op();
     logic [2:0] op_choice;
@@ -17,9 +23,6 @@ module tester (tinyalu_bfm bfm);
   // Estímulo principal
   // -----------------------------------------------------------------------
   initial begin
-    logic [15:0] result;
-    operation_t  op;
-
     // Reset inicial
     bfm.reset_alu();
 
@@ -29,16 +32,11 @@ module tester (tinyalu_bfm bfm);
     bfm.send_op(8'hFF, 8'hFF, mul_op, result);
 
     // Estímulos aleatorios
-    repeat (100) begin
+    for (i = 0; i < 100; i++) begin
       op = get_op();
-      if (op == rst_op) begin
-        bfm.reset_alu();
-      end else begin
-        bfm.send_op($urandom_range(0, 255),
-                    $urandom_range(0, 255),
-                    op,
-                    result);
-      end
+      rA = $urandom_range(0, 255);
+      rB = $urandom_range(0, 255);
+      bfm.send_op(rA, rB, op, result);
     end
 
     $display(">>> Tester: estimulos completados.");

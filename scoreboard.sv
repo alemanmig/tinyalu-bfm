@@ -4,7 +4,6 @@
 module scoreboard (tinyalu_bfm bfm);
   import tinyalu_pkg::*;
 
-  // Contadores de test
   int pass_count = 0;
   int fail_count = 0;
 
@@ -12,14 +11,14 @@ module scoreboard (tinyalu_bfm bfm);
   // Función de predicción (modelo de referencia)
   // -----------------------------------------------------------------------
   function logic [15:0] predict_result(
-    input logic [7:0]   A, B,
-    input operation_t   op
+    input logic [7:0]  iA, iB,
+    input operation_t  iop
   );
-    case (op)
-      add_op : return {8'h00, A} + {8'h00, B};
-      and_op : return {8'h00, A} & {8'h00, B};
-      xor_op : return {8'h00, A} ^ {8'h00, B};
-      mul_op : return A * B;
+    case (iop)
+      add_op : return {8'h00, iA} + {8'h00, iB};
+      and_op : return {8'h00, iA} & {8'h00, iB};
+      xor_op : return {8'h00, iA} ^ {8'h00, iB};
+      mul_op : return iA * iB;
       default: return 16'hX;
     endcase
   endfunction : predict_result
@@ -29,16 +28,18 @@ module scoreboard (tinyalu_bfm bfm);
   // -----------------------------------------------------------------------
   always @(posedge bfm.clk) begin
     if (bfm.done && bfm.reset_n) begin
-      logic [15:0] exp;
-      exp = predict_result(bfm.A, bfm.B, operation_t'(bfm.op));
+      logic [15:0]  exp;
+      operation_t   op_enum;      // variable local para poder llamar .name()
+      op_enum = operation_t'(bfm.op);
+      exp     = predict_result(bfm.A, bfm.B, op_enum);
 
       if (bfm.result !== exp) begin
         $error("[FAIL] op=%0s A=0x%02h B=0x%02h | got=0x%04h exp=0x%04h",
-               operation_t'(bfm.op).name(), bfm.A, bfm.B, bfm.result, exp);
+               op_enum.name(), bfm.A, bfm.B, bfm.result, exp);
         fail_count++;
       end else begin
         $display("[PASS] op=%0s A=0x%02h B=0x%02h | result=0x%04h",
-                 operation_t'(bfm.op).name(), bfm.A, bfm.B, bfm.result);
+                 op_enum.name(), bfm.A, bfm.B, bfm.result);
         pass_count++;
       end
     end
