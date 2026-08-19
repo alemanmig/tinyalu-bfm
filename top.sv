@@ -4,14 +4,10 @@
 module top;
   import tinyalu_pkg::*;
 
-  // -----------------------------------------------------------------------
-  // Instancia del BFM (interface)
-  // -----------------------------------------------------------------------
+  // BFM (interface)
   tinyalu_bfm bfm();
 
-  // -----------------------------------------------------------------------
-  // Instancia del DUT (VHDL)
-  // -----------------------------------------------------------------------
+  // DUT VHDL
   tinyalu dut (
     .clk     (bfm.clk),
     .reset_n (bfm.reset_n),
@@ -23,11 +19,9 @@ module top;
     .result  (bfm.result)
   );
 
-  // -----------------------------------------------------------------------
-  // Instancias del testbench
-  // -----------------------------------------------------------------------
-  tester     t   (bfm);
-  scoreboard sb  (bfm);
-  coverage   cov (bfm);
+  // Testbench
+  tester      t    (bfm);
+  scoreboard  sb   (bfm);
+  alu_coverage cov (bfm);   // renombrado: "coverage" es palabra reservada en SV
 
 endmodule : top
