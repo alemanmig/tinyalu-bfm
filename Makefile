@@ -77,7 +77,7 @@ XMELAB_COV_OPTS := -access +rwc -timescale 1ns/1ps -work $(W) \
                    $(CDSLIB_OPT) $(HDLVAR_OPT)
 
 XMSIM_OPTS      := -input run.do $(CDSLIB_OPT) $(HDLVAR_OPT)
-XMSIM_COV_OPTS  := -input run.do -covworkdir ./cov_work \
+XMSIM_COV_OPTS  := -input run.do -covworkdir ./cov_work -covoverwrite \
                    $(CDSLIB_OPT) $(HDLVAR_OPT)
 
 # Directorio de cobertura
