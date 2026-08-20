@@ -26,3 +26,6 @@ TestResults.xml
 *.var
 *.history
 *.d
+*.lib
+worklib/
+.simvision/
