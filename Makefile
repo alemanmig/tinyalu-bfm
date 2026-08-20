@@ -84,12 +84,17 @@ XMSIM_COV_OPTS  := -input run.do -covworkdir ./cov_work \
 COV_WORK := cov_work
 
 # Opciones todo-en-uno para xrun
+# -clean      → limpia la base de datos antes de compilar (evita MULPAK)
+# -xmlibdirname → usa su propio directorio, separado del flujo paso a paso
+XRUN_WORK := xrun_work
 XRUN_OPTS := \
-    -v93                     \
-    -sv                      \
-    -timescale 1ns/1ps       \
-    -access +rwc             \
-    -top $(TOP)     \
+    -clean                      \
+    -v93                        \
+    -sv                         \
+    -timescale 1ns/1ps          \
+    -access +rwc                \
+    -xmlibdirname $(XRUN_WORK)  \
+    -top $(TOP)                 \
     -input run.do
 
 # ---------------------------------------------------------------------------
@@ -155,24 +160,28 @@ elab_cov: compile_sv
 
 # ---------------------------------------------------------------------------
 # 4b. Simular con cobertura y generar reporte
+# Los datos de cobertura quedan en: cov_work/scope/test/
+# En Xcelium 24.x el reporte se genera con xcrg (no imc que es versión antigua)
 # ---------------------------------------------------------------------------
+COV_RUN := $(COV_WORK)/scope/test
+
 sim_cov: elab_cov
 	@echo ">>> Simulando con cobertura..."
 	$(XMSIM) $(XMSIM_COV_OPTS) $(W).$(TOP)
-	@echo ">>> Generando reporte de cobertura..."
-	imc -load $(COV_WORK) -execcmd \
-	    "report -summary -detail -out coverage_report.txt; exit" || true
+	@echo ">>> Generando reporte de cobertura con xcrg..."
+	xcrg -db $(COV_RUN) -report text -out coverage_report.txt 2>/dev/null || \
+	imc  -load $(COV_RUN) -execcmd \
+	     "report -summary -detail -out coverage_report.txt; exit" || true
 	@echo ">>> Reporte guardado en coverage_report.txt"
 
 # ---------------------------------------------------------------------------
 # Flujo todo-en-uno con xrun (más rápido para desarrollo)
+# No depende de "setup" — xrun gestiona su propia biblioteca en XRUN_WORK
 # ---------------------------------------------------------------------------
-xrun: setup
+xrun:
 	@echo ">>> Ejecutando xrun (todo-en-uno)..."
-	$(XRUN) $(XRUN_OPTS)    \
-	    $(CDSLIB_OPT)        \
-	    $(HDLVAR_OPT)        \
-	    $(VHDL_SRCS)         \
+	$(XRUN) $(XRUN_OPTS) \
+	    $(VHDL_SRCS)      \
 	    $(SV_SRCS)
 
 # ---------------------------------------------------------------------------
@@ -183,19 +192,21 @@ waves:
 	simvision $(WAVES) &
 
 # ---------------------------------------------------------------------------
-# Reporte de cobertura con IMC (sobre un cov_work existente)
+# Reporte de cobertura sobre un cov_work existente
+# Los datos quedan en cov_work/scope/test/ después de make sim_cov
 # ---------------------------------------------------------------------------
 cov:
 	@echo ">>> Generando reporte de cobertura..."
-	imc -load $(COV_WORK) -execcmd \
-	    "report -summary -detail -out coverage_report.txt; exit"
+	xcrg -db $(COV_RUN) -report text -out coverage_report.txt 2>/dev/null || \
+	imc  -load $(COV_RUN) -execcmd \
+	     "report -summary -detail -out coverage_report.txt; exit" || true
 
 # ---------------------------------------------------------------------------
 # Limpieza
 # ---------------------------------------------------------------------------
 clean:
 	@echo ">>> Limpiando artefactos..."
-	rm -rf $(W) $(WAVES) $(CDSLIB) $(HDLVAR) $(COV_WORK) \
+	rm -rf $(W) $(XRUN_WORK) $(WAVES) $(CDSLIB) $(HDLVAR) $(COV_WORK) \
 	       *.log *.key *.diag cov_work coverage_report.txt \
 	       xrun.history .simvision *.shm *.dsn *.trn
 
