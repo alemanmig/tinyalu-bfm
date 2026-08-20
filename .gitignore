@@ -29,3 +29,5 @@ TestResults.xml
 *.lib
 worklib/
 .simvision/
+dump.shm/
+cov_work/
