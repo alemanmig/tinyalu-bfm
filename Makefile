@@ -70,9 +70,18 @@ HDLVAR_OPT  := -hdlvar $(HDLVAR)
 
 XMVHDL_OPTS := -v93 -work $(W) $(CDSLIB_OPT) $(HDLVAR_OPT)
 XMVLOG_OPTS := -sv   -work $(W) $(CDSLIB_OPT) $(HDLVAR_OPT)
-XMELAB_OPTS := -access +rwc -timescale 1ns/1ps -work $(W) \
-               $(CDSLIB_OPT) $(HDLVAR_OPT)
-XMSIM_OPTS  := -input run.do $(CDSLIB_OPT) $(HDLVAR_OPT)
+XMELAB_OPTS     := -access +rwc -timescale 1ns/1ps -work $(W) \
+                   $(CDSLIB_OPT) $(HDLVAR_OPT)
+XMELAB_COV_OPTS := -access +rwc -timescale 1ns/1ps -work $(W) \
+                   -coverage all \
+                   $(CDSLIB_OPT) $(HDLVAR_OPT)
+
+XMSIM_OPTS      := -input run.do $(CDSLIB_OPT) $(HDLVAR_OPT)
+XMSIM_COV_OPTS  := -input run.do -covworkdir ./cov_work \
+                   $(CDSLIB_OPT) $(HDLVAR_OPT)
+
+# Directorio de cobertura
+COV_WORK := cov_work
 
 # Opciones todo-en-uno para xrun
 XRUN_OPTS := \
@@ -86,7 +95,7 @@ XRUN_OPTS := \
 # ---------------------------------------------------------------------------
 # Target por defecto: flujo paso a paso
 # ---------------------------------------------------------------------------
-.PHONY: all setup compile_vhdl compile_sv elab sim xrun waves cov clean help
+.PHONY: all setup compile_vhdl compile_sv elab sim elab_cov sim_cov xrun waves cov clean help
 
 all: sim
 
@@ -138,6 +147,24 @@ sim: elab
 	$(XMSIM) $(XMSIM_OPTS) $(W).$(TOP)
 
 # ---------------------------------------------------------------------------
+# 3b. Elaborar con cobertura habilitada
+# ---------------------------------------------------------------------------
+elab_cov: compile_sv
+	@echo ">>> Elaborando con cobertura..."
+	$(XMELAB) $(XMELAB_COV_OPTS) $(TOP)
+
+# ---------------------------------------------------------------------------
+# 4b. Simular con cobertura y generar reporte
+# ---------------------------------------------------------------------------
+sim_cov: elab_cov
+	@echo ">>> Simulando con cobertura..."
+	$(XMSIM) $(XMSIM_COV_OPTS) $(W).$(TOP)
+	@echo ">>> Generando reporte de cobertura..."
+	imc -load $(COV_WORK) -execcmd \
+	    "report -summary -detail -out coverage_report.txt; exit" || true
+	@echo ">>> Reporte guardado en coverage_report.txt"
+
+# ---------------------------------------------------------------------------
 # Flujo todo-en-uno con xrun (más rápido para desarrollo)
 # ---------------------------------------------------------------------------
 xrun: setup
@@ -156,11 +183,11 @@ waves:
 	simvision $(WAVES) &
 
 # ---------------------------------------------------------------------------
-# Reporte de cobertura con IMC
+# Reporte de cobertura con IMC (sobre un cov_work existente)
 # ---------------------------------------------------------------------------
 cov:
 	@echo ">>> Generando reporte de cobertura..."
-	imc -load cov_work/scope/$(W) -execcmd \
+	imc -load $(COV_WORK) -execcmd \
 	    "report -summary -detail -out coverage_report.txt; exit"
 
 # ---------------------------------------------------------------------------
@@ -168,7 +195,7 @@ cov:
 # ---------------------------------------------------------------------------
 clean:
 	@echo ">>> Limpiando artefactos..."
-	rm -rf $(W) $(WAVES) $(CDSLIB) $(HDLVAR) \
+	rm -rf $(W) $(WAVES) $(CDSLIB) $(HDLVAR) $(COV_WORK) \
 	       *.log *.key *.diag cov_work coverage_report.txt \
 	       xrun.history .simvision *.shm *.dsn *.trn
 
@@ -178,9 +205,10 @@ clean:
 help:
 	@echo ""
 	@echo "  Targets disponibles:"
-	@echo "    make          → setup → compile VHDL → compile SV → elab → sim"
-	@echo "    make xrun     → flujo todo-en-uno (xrun)"
-	@echo "    make waves    → abre SimVision con dump.shm"
-	@echo "    make cov      → genera reporte de cobertura (IMC)"
-	@echo "    make clean    → borra todos los artefactos (incluye cds.lib/hdl.var)"
+	@echo "    make           → compile VHDL → compile SV → elab → sim"
+	@echo "    make sim_cov   → compile → elab con coverage → sim → reporte"
+	@echo "    make cov       → reporte imc sobre cov_work existente"
+	@echo "    make xrun      → flujo todo-en-uno (xrun)"
+	@echo "    make waves     → abre SimVision con dump.shm"
+	@echo "    make clean     → borra todos los artefactos"
 	@echo ""
