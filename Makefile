@@ -171,7 +171,7 @@ sim_cov: elab_cov
 	@echo ">>> Generando reporte de cobertura con xcrg..."
 	xcrg -db $(COV_RUN) -report text -out coverage_report.txt 2>/dev/null || \
 	imc  -load $(COV_RUN) -execcmd \
-	     "report -summary -detail -out coverage_report.txt; exit" || true
+	     "report -summary -out coverage_report.txt; exit" || true
 	@echo ">>> Reporte guardado en coverage_report.txt"
 
 # ---------------------------------------------------------------------------
@@ -199,7 +199,7 @@ cov:
 	@echo ">>> Generando reporte de cobertura..."
 	xcrg -db $(COV_RUN) -report text -out coverage_report.txt 2>/dev/null || \
 	imc  -load $(COV_RUN) -execcmd \
-	     "report -summary -detail -out coverage_report.txt; exit" || true
+	     "report -summary -out coverage_report.txt; exit" || true
 
 # ---------------------------------------------------------------------------
 # Limpieza
